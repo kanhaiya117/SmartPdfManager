@@ -37,10 +37,8 @@ The verified debug APK is generated at:
 
 ## Release Checklist
 
-1. Replace the Google sample App ID in
-   `android/app/src/main/AndroidManifest.xml` with the AdMob app ID in the
-   format `ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY`. An ad unit ID cannot be
-   used in this manifest field.
+1. The production AdMob App ID is configured in
+   `android/app/src/main/AndroidManifest.xml`.
 2. The production interstitial unit is configured in
    `lib/core/services/ad_service.dart`. Debug builds automatically use
    Google's test unit.
