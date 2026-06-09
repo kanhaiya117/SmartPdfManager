@@ -105,7 +105,13 @@ class _UtilityToolScreenState extends ConsumerState<UtilityToolScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('PDF saved successfully.')),
         );
-        await OpenFilex.open(output);
+        await ref
+            .read(interstitialAdServiceProvider)
+            .showAfterCompletedAction(
+              onContinue: () async {
+                await OpenFilex.open(output);
+              },
+            );
       }
     } catch (error) {
       if (mounted) {

@@ -58,7 +58,15 @@ class _OcrScreenState extends ConsumerState<OcrScreen> {
             italic: false,
           );
       await ref.read(documentsProvider.notifier).add(path);
-      if (mounted) await OpenFilex.open(path);
+      if (mounted) {
+        await ref
+            .read(interstitialAdServiceProvider)
+            .showAfterCompletedAction(
+              onContinue: () async {
+                await OpenFilex.open(path);
+              },
+            );
+      }
     } catch (error) {
       if (mounted) _message(error.toString());
     }

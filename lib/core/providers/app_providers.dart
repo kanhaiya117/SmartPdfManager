@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_settings.dart';
 import '../models/document_record.dart';
+import '../services/ad_service.dart';
 import '../services/file_service.dart';
 import '../services/pdf_service.dart';
 
@@ -17,6 +18,11 @@ final fileServiceProvider = Provider((ref) => FileService());
 final pdfServiceProvider = Provider(
   (ref) => PdfService(ref.watch(fileServiceProvider)),
 );
+final interstitialAdServiceProvider = Provider((ref) {
+  final service = InterstitialAdService()..preload();
+  ref.onDispose(service.dispose);
+  return service;
+});
 
 final settingsProvider = NotifierProvider<SettingsNotifier, AppSettings>(
   SettingsNotifier.new,

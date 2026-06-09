@@ -17,8 +17,10 @@ class _BannerAdCardState extends State<BannerAdCard> {
   @override
   void initState() {
     super.initState();
+    final adUnitId = AdIds.banner;
+    if (adUnitId == null) return;
     _ad = BannerAd(
-      adUnitId: AdIds.banner,
+      adUnitId: adUnitId,
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(

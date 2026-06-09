@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/app_providers.dart';
-import '../../../core/services/ad_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_background.dart';
 import '../../../core/widgets/banner_ad_card.dart';
@@ -23,21 +22,14 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  final _appOpenAd = AppOpenAdService();
   var _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _appOpenAd.loadAndShowOnce();
+      ref.read(interstitialAdServiceProvider).preload();
     });
-  }
-
-  @override
-  void dispose() {
-    _appOpenAd.dispose();
-    super.dispose();
   }
 
   @override

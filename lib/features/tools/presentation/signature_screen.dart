@@ -99,7 +99,15 @@ class _SignatureScreenState extends ConsumerState<SignatureScreen> {
             width: _width,
           );
       await ref.read(documentsProvider.notifier).add(output);
-      if (mounted) await OpenFilex.open(output);
+      if (mounted) {
+        await ref
+            .read(interstitialAdServiceProvider)
+            .showAfterCompletedAction(
+              onContinue: () async {
+                await OpenFilex.open(output);
+              },
+            );
+      }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(

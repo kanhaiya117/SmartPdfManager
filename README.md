@@ -13,7 +13,8 @@ Dart 3.12. The minimum supported Android version is Android 8.0 (API 26).
 - Multi-page camera scanning with crop and reorder
 - Offline ML Kit OCR
 - Material 3 light/dark themes and responsive dashboard
-- Session-only App Open ad and a small dashboard banner
+- User-friendly interstitial monetization after successful PDF exports
+- Debug-only dashboard banner for layout verification
 
 ## Run
 
@@ -37,8 +38,12 @@ The verified debug APK is generated at:
 ## Release Checklist
 
 1. Replace the Google sample App ID in
-   `android/app/src/main/AndroidManifest.xml`.
-2. Replace test ad unit IDs in `lib/core/services/ad_service.dart`.
+   `android/app/src/main/AndroidManifest.xml` with the AdMob app ID in the
+   format `ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY`. An ad unit ID cannot be
+   used in this manifest field.
+2. The production interstitial unit is configured in
+   `lib/core/services/ad_service.dart`. Debug builds automatically use
+   Google's test unit.
 3. Configure a private Android release keystore and replace the debug signing
    fallback in `android/app/build.gradle.kts`.
 4. Confirm Syncfusion Community or commercial license eligibility.
@@ -54,5 +59,8 @@ The verified debug APK is generated at:
 - PDF compression optimizes PDF streams. Already-compressed image-heavy PDFs
   may see a modest reduction unless their images are rasterized and resampled.
 - Output files are stored in the app's external `Smart PDF Manager` directory.
+- Interstitials are shown only after successful output creation: first after
+  two completed tasks, then after at least three more tasks and a three-minute
+  cooldown, with a maximum of two per app session.
 - `android/gradle.properties` disables Kotlin incremental compilation because
   this Windows workspace is on `D:` while the Pub cache is on `C:`.

@@ -50,7 +50,15 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
           .read(pdfServiceProvider)
           .imagesToPdf(_pages, quality: 88);
       await ref.read(documentsProvider.notifier).add(path);
-      if (mounted) await OpenFilex.open(path);
+      if (mounted) {
+        await ref
+            .read(interstitialAdServiceProvider)
+            .showAfterCompletedAction(
+              onContinue: () async {
+                await OpenFilex.open(path);
+              },
+            );
+      }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(

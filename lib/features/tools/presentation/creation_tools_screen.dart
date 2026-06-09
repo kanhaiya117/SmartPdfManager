@@ -41,7 +41,14 @@ class _TextToPdfScreenState extends ConsumerState<TextToPdfScreen> {
             italic: _italic,
           );
       await ref.read(documentsProvider.notifier).add(path);
-      if (mounted) await _showResult(context, path);
+      if (mounted) {
+        await ref
+            .read(interstitialAdServiceProvider)
+            .showAfterCompletedAction(
+              onContinue: () =>
+                  mounted ? _showResult(context, path) : Future<void>.value(),
+            );
+      }
     } catch (error) {
       if (mounted) _message(context, error.toString());
     } finally {
@@ -155,7 +162,14 @@ class _ImageToPdfScreenState extends ConsumerState<ImageToPdfScreen> {
             quality: _quality.round(),
           );
       await ref.read(documentsProvider.notifier).add(path);
-      if (mounted) await _showResult(context, path);
+      if (mounted) {
+        await ref
+            .read(interstitialAdServiceProvider)
+            .showAfterCompletedAction(
+              onContinue: () =>
+                  mounted ? _showResult(context, path) : Future<void>.value(),
+            );
+      }
     } catch (error) {
       if (mounted) _message(context, error.toString());
     } finally {
@@ -274,7 +288,14 @@ class _DocxToPdfScreenState extends ConsumerState<DocxToPdfScreen> {
     try {
       final output = await ref.read(pdfServiceProvider).docxToPdf(_path!);
       await ref.read(documentsProvider.notifier).add(output);
-      if (mounted) await _showResult(context, output);
+      if (mounted) {
+        await ref
+            .read(interstitialAdServiceProvider)
+            .showAfterCompletedAction(
+              onContinue: () =>
+                  mounted ? _showResult(context, output) : Future<void>.value(),
+            );
+      }
     } catch (error) {
       if (mounted) _message(context, error.toString());
     } finally {
