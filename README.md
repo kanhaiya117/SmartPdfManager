@@ -7,11 +7,11 @@ Dart 3.12. The minimum supported Android version is Android 8.0 (API 26).
 
 - PDF reading, search, zoom, page jump, dark reading, and annotations
 - Recent files, favorites, rename, delete, share, copy, move, and details
-- Reusable drawn signatures with page, position, and size controls
+- Reusable drawn signatures with visual drag-and-resize PDF placement
 - Text, image, scanned document, OCR text, and DOCX-to-PDF creation
 - Merge, split, compress, password, watermark, and text-overlay tools
 - Multi-page camera scanning with crop and reorder
-- Offline ML Kit OCR
+- Offline English/Hindi ML Kit OCR with local extractive summaries
 - Material 3 light/dark themes and responsive dashboard
 - User-friendly interstitial monetization after successful PDF exports
 - Debug-only dashboard banner for layout verification
@@ -51,9 +51,10 @@ The verified debug APK is generated at:
 
 ## Notes
 
-- DOCX conversion is fully offline and retains text and paragraph structure.
-  Complex Word layouts, charts, and embedded fonts cannot be reproduced
-  exactly without a desktop rendering engine or server-side Office converter.
+- DOCX conversion is fully offline and retains headings, run formatting,
+  alignment, lists, tables, and English/Hindi text. Floating shapes, charts,
+  text boxes, and advanced Word effects may differ without Microsoft Word's
+  rendering engine.
 - PDF compression optimizes PDF streams. Already-compressed image-heavy PDFs
   may see a modest reduction unless their images are rasterized and resampled.
 - Output files are stored in the app's external `Smart PDF Manager` directory.

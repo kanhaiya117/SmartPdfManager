@@ -307,7 +307,7 @@ class _DocxToPdfScreenState extends ConsumerState<DocxToPdfScreen> {
   Widget build(BuildContext context) {
     return ToolScaffold(
       title: 'DOCX to PDF',
-      subtitle: 'Convert DOCX text and paragraph structure entirely offline.',
+      subtitle: 'Preserve headings, text styles, lists and tables offline.',
       icon: Icons.description_rounded,
       child: Column(
         children: [
@@ -323,9 +323,9 @@ class _DocxToPdfScreenState extends ConsumerState<DocxToPdfScreen> {
           const Card(
             child: ListTile(
               leading: Icon(Icons.info_outline_rounded),
-              title: Text('Offline compatibility'),
+              title: Text('Formatting support'),
               subtitle: Text(
-                'Text and paragraphs are retained. Complex Word layouts, charts and embedded fonts may not reproduce exactly.',
+                'Preserves paragraphs, headings, bold, italic, underline, strike-through, alignment, lists, tables and Hindi text. Floating shapes and advanced Word effects may differ.',
               ),
             ),
           ),

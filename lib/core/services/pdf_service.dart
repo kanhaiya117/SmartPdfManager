@@ -1,8 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
-import 'dart:ui';
 
 import 'package:archive/archive.dart';
+import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:pdf/pdf.dart' as plain;
 import 'package:pdf/widgets.dart' as pw;
@@ -26,6 +26,7 @@ class PdfService {
     required bool italic,
   }) async {
     if (text.trim().isEmpty) throw const AppException('Enter some text first.');
+    final fonts = await _loadDocumentFonts();
     final document = pw.Document();
     document.addPage(
       pw.MultiPage(
@@ -38,6 +39,8 @@ class PdfService {
               fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
               fontStyle: italic ? pw.FontStyle.italic : pw.FontStyle.normal,
               lineSpacing: 3,
+              font: fonts.regular,
+              fontFallback: [fonts.devanagari],
             ),
           ),
         ],
@@ -80,23 +83,233 @@ class PdfService {
     final archive = ZipDecoder().decodeBytes(data);
     final entry = archive.findFile('word/document.xml');
     if (entry == null) throw const AppException('This DOCX file is invalid.');
-    final xml = XmlDocument.parse(String.fromCharCodes(entry.content));
-    final paragraphs = xml
-        .findAllElements('w:p')
-        .map(
-          (paragraph) => paragraph
-              .findAllElements('w:t')
-              .map((node) => node.innerText)
-              .join(),
-        )
-        .where((value) => value.trim().isNotEmpty)
-        .toList();
-    return textToPdf(
-      text: paragraphs.join('\n\n'),
-      fontSize: 12,
-      bold: false,
-      italic: false,
+    final xml = XmlDocument.parse(utf8.decode(entry.content as List<int>));
+    final body = xml.descendants
+        .whereType<XmlElement>()
+        .where((element) => element.name.local == 'body')
+        .firstOrNull;
+    if (body == null) {
+      throw const AppException('This DOCX has no document body.');
+    }
+
+    final fonts = await _loadDocumentFonts();
+    final blocks = <pw.Widget>[];
+    for (final child in body.childElements) {
+      switch (child.name.local) {
+        case 'p':
+          final paragraph = _parseDocxParagraph(child, fonts);
+          if (paragraph != null) blocks.add(paragraph);
+        case 'tbl':
+          final table = _parseDocxTable(child, fonts);
+          if (table != null) blocks.add(table);
+      }
+    }
+    if (blocks.isEmpty) {
+      throw const AppException('No readable content was found in this DOCX.');
+    }
+
+    final document = pw.Document();
+    document.addPage(
+      pw.MultiPage(pageTheme: _docxPageTheme(body), build: (_) => blocks),
     );
+    return _files.writePdf(await document.save(), 'Converted document');
+  }
+
+  Future<({pw.Font regular, pw.Font devanagari})> _loadDocumentFonts() async {
+    final regular = await rootBundle.load('assets/fonts/NotoSans-Variable.ttf');
+    final devanagari = await rootBundle.load(
+      'assets/fonts/NotoSansDevanagari-Variable.ttf',
+    );
+    return (regular: pw.Font.ttf(regular), devanagari: pw.Font.ttf(devanagari));
+  }
+
+  pw.Widget? _parseDocxParagraph(
+    XmlElement paragraph,
+    ({pw.Font regular, pw.Font devanagari}) fonts,
+  ) {
+    final properties = _firstChild(paragraph, 'pPr');
+    final styleName =
+        _attribute(_firstChild(properties, 'pStyle'), 'val') ?? '';
+    final alignment = _attribute(_firstChild(properties, 'jc'), 'val');
+    final spacing = _firstChild(properties, 'spacing');
+    final indentation = _firstChild(properties, 'ind');
+    final isList = _firstChild(properties, 'numPr') != null;
+    final isHeading = styleName.toLowerCase().startsWith('heading');
+    final headingLevel =
+        int.tryParse(styleName.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
+    final baseSize = isHeading
+        ? (24 - (headingLevel - 1) * 2).clamp(14, 24)
+        : 11;
+
+    final spans = <pw.InlineSpan>[];
+    if (isList) {
+      spans.add(
+        pw.TextSpan(
+          text: '• ',
+          style: pw.TextStyle(
+            font: fonts.regular,
+            fontFallback: [fonts.devanagari],
+            fontSize: baseSize.toDouble(),
+          ),
+        ),
+      );
+    }
+
+    for (final run in paragraph.descendants.whereType<XmlElement>().where(
+      (element) => element.name.local == 'r',
+    )) {
+      final text = _runText(run);
+      if (text.isEmpty) continue;
+      final runProperties = _firstChild(run, 'rPr');
+      final sizeValue = double.tryParse(
+        _attribute(_firstChild(runProperties, 'sz'), 'val') ?? '',
+      );
+      final decorations = <pw.TextDecoration>[
+        if (_firstChild(runProperties, 'u') != null)
+          pw.TextDecoration.underline,
+        if (_firstChild(runProperties, 'strike') != null)
+          pw.TextDecoration.lineThrough,
+      ];
+      spans.add(
+        pw.TextSpan(
+          text: text,
+          style: pw.TextStyle(
+            font: fonts.regular,
+            fontFallback: [fonts.devanagari],
+            fontSize: sizeValue == null ? baseSize.toDouble() : sizeValue / 2,
+            fontWeight: isHeading || _firstChild(runProperties, 'b') != null
+                ? pw.FontWeight.bold
+                : pw.FontWeight.normal,
+            fontStyle: _firstChild(runProperties, 'i') != null
+                ? pw.FontStyle.italic
+                : pw.FontStyle.normal,
+            decoration: decorations.isEmpty
+                ? pw.TextDecoration.none
+                : pw.TextDecoration.combine(decorations),
+          ),
+        ),
+      );
+    }
+    if (spans.isEmpty) return pw.SizedBox(height: 7);
+    return pw.Padding(
+      padding: pw.EdgeInsets.only(
+        left:
+            (isList ? 18 : 0) +
+            _twips(_attribute(indentation, 'left')) +
+            _twips(_attribute(indentation, 'start')),
+        right:
+            _twips(_attribute(indentation, 'right')) +
+            _twips(_attribute(indentation, 'end')),
+        bottom: _twips(_attribute(spacing, 'after')) + (isHeading ? 8 : 5),
+        top: _twips(_attribute(spacing, 'before')) + (isHeading ? 8 : 0),
+      ),
+      child: pw.RichText(
+        textAlign: switch (alignment) {
+          'center' => pw.TextAlign.center,
+          'right' || 'end' => pw.TextAlign.right,
+          'both' || 'distribute' => pw.TextAlign.justify,
+          _ => pw.TextAlign.left,
+        },
+        text: pw.TextSpan(children: spans),
+      ),
+    );
+  }
+
+  pw.Widget? _parseDocxTable(
+    XmlElement table,
+    ({pw.Font regular, pw.Font devanagari}) fonts,
+  ) {
+    final rows = table.childElements
+        .where((element) => element.name.local == 'tr')
+        .map((row) {
+          return pw.TableRow(
+            children: row.childElements
+                .where((element) => element.name.local == 'tc')
+                .map((cell) {
+                  final paragraphs = cell.childElements
+                      .where((element) => element.name.local == 'p')
+                      .map((element) => _parseDocxParagraph(element, fonts))
+                      .whereType<pw.Widget>()
+                      .toList();
+                  return pw.Padding(
+                    padding: const pw.EdgeInsets.all(6),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: paragraphs,
+                    ),
+                  );
+                })
+                .toList(),
+          );
+        })
+        .where((row) => row.children.isNotEmpty)
+        .toList();
+    if (rows.isEmpty) return null;
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 8),
+      child: pw.Table(
+        border: pw.TableBorder.all(width: 0.5, color: plain.PdfColors.grey500),
+        children: rows,
+      ),
+    );
+  }
+
+  String _runText(XmlElement run) {
+    final buffer = StringBuffer();
+    for (final node in run.descendants.whereType<XmlElement>()) {
+      switch (node.name.local) {
+        case 't':
+          buffer.write(node.innerText);
+        case 'tab':
+          buffer.write('    ');
+        case 'br':
+        case 'cr':
+          buffer.writeln();
+      }
+    }
+    return buffer.toString();
+  }
+
+  XmlElement? _firstChild(XmlElement? parent, String localName) {
+    if (parent == null) return null;
+    return parent.childElements
+        .where((element) => element.name.local == localName)
+        .firstOrNull;
+  }
+
+  String? _attribute(XmlElement? element, String localName) {
+    if (element == null) return null;
+    for (final attribute in element.attributes) {
+      if (attribute.name.local == localName) return attribute.value;
+    }
+    return null;
+  }
+
+  pw.PageTheme _docxPageTheme(XmlElement body) {
+    final section = body.childElements
+        .where((element) => element.name.local == 'sectPr')
+        .firstOrNull;
+    final pageSize = _firstChild(section, 'pgSz');
+    final margins = _firstChild(section, 'pgMar');
+    final width = _twips(_attribute(pageSize, 'w'));
+    final height = _twips(_attribute(pageSize, 'h'));
+    final format = width > 0 && height > 0
+        ? plain.PdfPageFormat(width, height)
+        : plain.PdfPageFormat.a4;
+    return pw.PageTheme(
+      pageFormat: format,
+      margin: pw.EdgeInsets.fromLTRB(
+        _twips(_attribute(margins, 'left'), fallback: 46),
+        _twips(_attribute(margins, 'top'), fallback: 48),
+        _twips(_attribute(margins, 'right'), fallback: 46),
+        _twips(_attribute(margins, 'bottom'), fallback: 48),
+      ),
+    );
+  }
+
+  double _twips(String? value, {double fallback = 0}) {
+    final twips = double.tryParse(value ?? '');
+    return twips == null ? fallback : twips / 20;
   }
 
   Future<String> merge(List<String> paths) async {
@@ -156,6 +369,19 @@ class PdfService {
     final count = document.pages.count;
     document.dispose();
     return count;
+  }
+
+  Future<List<Size>> pageSizes(String path, {String? password}) async {
+    final document = PdfDocument(
+      inputBytes: await File(path).readAsBytes(),
+      password: password,
+    );
+    final sizes = [
+      for (var index = 0; index < document.pages.count; index++)
+        document.pages[index].getClientSize(),
+    ];
+    document.dispose();
+    return sizes;
   }
 
   Future<String> compress(String path, PdfCompressionMode mode) async {
